@@ -51,7 +51,11 @@ See `.env.example`. Only `DATABASE_URL` is required. In production also set:
 - `NEXT_PUBLIC_SITE_URL` — public origin, used in share links, Open Graph tags and the sitemap.
 - `AUTH_SECRET` — random string that salts the stored IP hashes.
 - `ADMIN_EMAILS` — comma-separated admin emails.
+<<<<<<< HEAD
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` — to send verification and reset emails via Nodemailer SMTP.
+=======
+- `RESEND_API_KEY` + `MAIL_FROM` — to actually send verification and reset emails.
+>>>>>>> 459f73a5be8e0df71161d2155bc61f3e71d49e2b
 
 ### The admin (competition creator) account
 

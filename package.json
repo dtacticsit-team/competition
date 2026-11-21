@@ -13,7 +13,10 @@
     "drizzle-orm": "0.45.2",
     "lucide-react": "^1.76.0",
     "next": "16.4.2",
+<<<<<<< HEAD
     "nodemailer": "^10.6.1",
+=======
+>>>>>>> 459f73a5be8e0df71161d2155bc61f3e71d49e2b
     "pg": "8.20.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
@@ -23,7 +26,10 @@
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.17",
     "@types/node": "22.19.15",
+<<<<<<< HEAD
     "@types/nodemailer": "^8.0.2",
+=======
+>>>>>>> 459f73a5be8e0df71161d2155bc61f3e71d49e2b
     "@types/pg": "8.18.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
