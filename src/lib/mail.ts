@@ -30,6 +30,7 @@ function getTransporter(): Transporter | null {
       host,
       port,
       secure,
+      requireTLS: !secure,
       auth: user || pass ? { user: user ?? "", pass: pass ?? "" } : undefined,
       connectionTimeout: 10_000,
       greetingTimeout: 10_000,
