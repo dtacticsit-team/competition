@@ -32,9 +32,116 @@ export async function verifyPassword(password: string, stored: string) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
+export const RESERVED_USERNAMES = new Set([
+  "admin",
+  "administrator",
+  "api",
+  "app",
+  "auth",
+  "competition",
+  "competitions",
+  "cron",
+  "dashboard",
+  "explore",
+  "feed",
+  "help",
+  "image",
+  "images",
+  "kolam",
+  "kolamfest",
+  "login",
+  "logout",
+  "moderator",
+  "profile",
+  "register",
+  "reset",
+  "root",
+  "settings",
+  "submit",
+  "support",
+  "system",
+  "terms",
+  "u",
+  "user",
+  "users",
+  "verify",
+  "vote",
+  "winner",
+  "winners",
+]);
+
+export function isValidUsername(username: string): boolean {
+  if (typeof username !== "string") return false;
+  const normalized = username.trim().toLowerCase();
+  if (!/^[a-z0-9_]{3,24}$/.test(normalized)) return false;
+  return !RESERVED_USERNAMES.has(normalized);
+}
+
+/**
+ * Normalizes a display name into a base username candidate.
+ * e.g. "Karthik G" -> "karthik_g", "வானதி" -> "kolam_artist"
+ */
+export function normalizeNameToUsername(name: string): string {
+  let base = (name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_{2,}/g, "_");
+
+  if (base.length < 3) {
+    base = "kolam_artist";
+  }
+
+  if (base.length > 18) {
+    base = base.slice(0, 18).replace(/_+$/, "");
+    if (base.length < 3) base = "kolam_artist";
+  }
+
+  if (RESERVED_USERNAMES.has(base)) {
+    base = `${base}_artist`;
+  }
+
+  return base;
+}
+
+/**
+ * Generates an available, non-reserved, valid unique username for a new user.
+ */
+export async function generateUniqueUsername(name: string): Promise<string> {
+  const base = normalizeNameToUsername(name);
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, base))
+    .limit(1);
+
+  if (!existing && !RESERVED_USERNAMES.has(base)) {
+    return base;
+  }
+
+  for (let suffix = 1; suffix <= 9999; suffix++) {
+    const candidate = `${base.slice(0, 24 - String(suffix).length - 1)}_${suffix}`;
+    const [row] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, candidate))
+      .limit(1);
+
+    if (!row && !RESERVED_USERNAMES.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  const rand = randomBytes(3).toString("hex");
+  return `artist_${rand}`;
+}
+
 export type SessionUser = {
   id: string;
   name: string;
+  username: string;
+  bio: string | null;
   email: string;
   phone: string;
   role: string;
@@ -70,6 +177,8 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     .select({
       id: users.id,
       name: users.name,
+      username: users.username,
+      bio: users.bio,
       email: users.email,
       phone: users.phone,
       role: users.role,

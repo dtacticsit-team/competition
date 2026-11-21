@@ -163,9 +163,21 @@ export function KolamCard({ item, eager = false }: { item: FeedItem; eager?: boo
   return (
     <article className="card group flex flex-col overflow-hidden">
       <header className="flex items-center gap-3 px-4 py-3">
-        <Avatar name={item.userName} imageId={item.userImageId} />
+        {item.userUsername ? (
+          <Link href={`/u/${item.userUsername}`} className="shrink-0 transition hover:opacity-85" aria-label={item.userName}>
+            <Avatar name={item.userName} imageId={item.userImageId} />
+          </Link>
+        ) : (
+          <Avatar name={item.userName} imageId={item.userImageId} />
+        )}
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-ink">{item.userName}</p>
+          {item.userUsername ? (
+            <Link href={`/u/${item.userUsername}`} className="block truncate text-sm font-semibold text-ink hover:text-navy hover:underline">
+              {item.userName}
+            </Link>
+          ) : (
+            <p className="truncate text-sm font-semibold text-ink">{item.userName}</p>
+          )}
           <p className="truncate text-xs text-muted">
             <Link href={`/competitions/${item.competitionId}`} className="hover:text-navy hover:underline">
               {item.competitionTitle}

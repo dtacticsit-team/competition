@@ -12,7 +12,7 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-full focus:bg-navy focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">
         {t("nav.skip")}
       </a>
-      <SiteNav user={user ? { name: user.name, role: user.role, profileImageId: user.profileImageId } : null} />
+      <SiteNav user={user ? { name: user.name, username: user.username, role: user.role, profileImageId: user.profileImageId } : null} />
       <main id="main" className="pb-10">
         {children}
       </main>

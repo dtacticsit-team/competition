@@ -20,6 +20,7 @@ if (existsSync(".env")) {
 const email = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 const password = process.env.ADMIN_PASSWORD ?? "";
 const name = process.env.ADMIN_NAME?.trim() || "Competition Admin";
+const username = (process.env.ADMIN_USERNAME ?? "admin").trim().toLowerCase();
 const phone = process.env.ADMIN_PHONE?.trim() || "9999999999";
 
 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -46,14 +47,15 @@ const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await client.connect();
 try {
   const { rows } = await client.query(
-    `insert into users (name, email, phone, password_hash, role, email_verified_at)
-     values ($1, $2, $3, $4, 'admin', now())
+    `insert into users (name, username, email, phone, password_hash, role, email_verified_at)
+     values ($1, $2, $3, $4, $5, 'admin', now())
      on conflict (email) do update
        set password_hash = excluded.password_hash,
+           username = coalesce(users.username, excluded.username),
            role = 'admin',
            email_verified_at = coalesce(users.email_verified_at, now())
      returning id, (xmax = 0) as created`,
-    [name, email, phone, passwordHash],
+    [name, username, email, phone, passwordHash],
   );
   console.log(`${rows[0].created ? "Created" : "Updated"} admin account: ${email}`);
   console.log("Log in at /login with this email and ADMIN_PASSWORD from .env.");

@@ -10,8 +10,10 @@ import { authTokens, sessions, users } from "@/db/schema";
 import {
   createSession,
   destroySession,
+  generateUniqueUsername,
   hashPassword,
   newToken,
+  RESERVED_USERNAMES,
   requireUser,
   safeNext,
   sha256,
@@ -29,6 +31,15 @@ const str = (fd: FormData, key: string) => String(fd.get(key) ?? "");
 const firstError = (e: z.ZodError) => e.issues[0]?.message ?? "errors.generic";
 
 const nameSchema = z.string().trim().min(2, "errors.name").max(80, "errors.name");
+const usernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, "errors.username")
+  .max(24, "errors.username")
+  .regex(/^[a-z0-9_]{3,24}$/, "errors.username")
+  .refine((u) => !RESERVED_USERNAMES.has(u), { message: "errors.usernameReserved" });
+const bioSchema = z.string().trim().max(300, "errors.bioLong").optional().nullable();
 const emailSchema = z.string().trim().toLowerCase().email("errors.email").max(200, "errors.email");
 const phoneSchema = z.string().trim().regex(/^\+?[0-9][0-9\s-]{8,16}$/, "errors.phone");
 const passwordSchema = z.string().min(8, "errors.passwordShort").max(200, "errors.passwordShort");
@@ -67,15 +78,16 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
   if (existing) return { error: "errors.emailTaken" };
 
   const role = (await shouldBeAdmin(email)) ? "admin" : "user";
+  const username = await generateUniqueUsername(name);
   let userId: string;
   try {
     const [row] = await db
       .insert(users)
-      .values({ name, email, phone, role, passwordHash: await hashPassword(password) })
+      .values({ name, username, email, phone, role, passwordHash: await hashPassword(password) })
       .returning({ id: users.id });
     userId = row.id;
   } catch {
-    return { error: "errors.emailTaken" }; // lost a race on the unique email index
+    return { error: "errors.emailTaken" }; // lost a race on the unique email index or username
   }
   await createSession(userId);
   await sendVerification(userId, email);
@@ -162,8 +174,35 @@ export async function resendVerificationAction(_: FormState, _fd: FormData): Pro
 
 export async function updateProfileAction(_: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser("/dashboard");
-  const parsed = z.object({ name: nameSchema, phone: phoneSchema }).safeParse({ name: str(fd, "name"), phone: str(fd, "phone") });
+  const rawUsername = str(fd, "username").trim().toLowerCase();
+  const rawBio = str(fd, "bio").trim() || null;
+
+  const parsed = z
+    .object({
+      name: nameSchema,
+      username: usernameSchema,
+      bio: bioSchema,
+      phone: phoneSchema,
+    })
+    .safeParse({
+      name: str(fd, "name"),
+      username: rawUsername,
+      bio: rawBio,
+      phone: str(fd, "phone"),
+    });
+
   if (!parsed.success) return { error: firstError(parsed.error) };
+
+  // Check username uniqueness if changing
+  if (parsed.data.username !== user.username) {
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, parsed.data.username));
+    if (existing && existing.id !== user.id) {
+      return { error: "errors.usernameTaken" };
+    }
+  }
 
   let profileImageId = user.profileImageId;
   const file = fd.get("image");
@@ -172,7 +211,18 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
     if ("error" in saved) return saved;
     profileImageId = saved.id;
   }
-  await db.update(users).set({ ...parsed.data, profileImageId }).where(eq(users.id, user.id));
+
+  await db
+    .update(users)
+    .set({
+      name: parsed.data.name,
+      username: parsed.data.username,
+      bio: parsed.data.bio,
+      phone: parsed.data.phone,
+      profileImageId,
+    })
+    .where(eq(users.id, user.id));
+
   if (profileImageId !== user.profileImageId) await deleteImage(user.profileImageId);
   revalidatePath("/", "layout");
   return { ok: "dashboard.profileSaved" };

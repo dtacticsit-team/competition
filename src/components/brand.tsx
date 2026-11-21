@@ -36,7 +36,13 @@ export function FacebookIcon({ className = "h-5 w-5" }: { className?: string }) 
   );
 }
 
-const AVATAR_SIZES = { sm: "h-8 w-8 text-xs", md: "h-10 w-10 text-sm", lg: "h-16 w-16 text-xl" } as const;
+const AVATAR_SIZES = {
+  sm: "h-8 w-8 text-xs",
+  md: "h-10 w-10 text-sm",
+  lg: "h-16 w-16 text-xl",
+  xl: "h-20 w-20 text-2xl",
+  "2xl": "h-24 w-24 text-3xl sm:h-28 sm:w-28 sm:text-4xl",
+} as const;
 
 export function Avatar({ name, imageId, size = "md" }: { name: string; imageId?: string | null; size?: keyof typeof AVATAR_SIZES }) {
   const cls = `${AVATAR_SIZES[size]} shrink-0 rounded-full ring-2 ring-paper`;

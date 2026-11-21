@@ -77,11 +77,30 @@ export default async function PostPage({ params }: Props) {
 
         <div className="lg:py-2">
           <div className="flex items-center gap-3">
-            <Avatar name={item.userName} imageId={item.userImageId} size="lg" />
+            {item.userUsername ? (
+              <Link href={`/u/${item.userUsername}`} className="shrink-0 transition hover:opacity-85" aria-label={item.userName}>
+                <Avatar name={item.userName} imageId={item.userImageId} size="lg" />
+              </Link>
+            ) : (
+              <Avatar name={item.userName} imageId={item.userImageId} size="lg" />
+            )}
             <div className="min-w-0">
-              <p className="truncate text-lg font-semibold text-ink">{item.userName}</p>
+              {item.userUsername ? (
+                <Link href={`/u/${item.userUsername}`} className="block truncate text-lg font-semibold text-ink hover:text-navy hover:underline">
+                  {item.userName}
+                </Link>
+              ) : (
+                <p className="truncate text-lg font-semibold text-ink">{item.userName}</p>
+              )}
               <p className="text-sm text-muted">
-                {t("post.participant")} · {item.dateLabel}
+                {item.userUsername ? (
+                  <Link href={`/u/${item.userUsername}`} className="text-navy hover:underline">
+                    @{item.userUsername}
+                  </Link>
+                ) : (
+                  t("post.participant")
+                )}{" "}
+                · {item.dateLabel}
               </p>
             </div>
           </div>

@@ -42,20 +42,28 @@ export default async function DashboardPage() {
 
   return (
     <div className="page pt-8 sm:pt-12">
-      <div className="flex items-center gap-4">
-        <Avatar name={user.name} imageId={user.profileImageId} size="lg" />
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold text-navy sm:text-3xl">{t("dashboard.greeting", { name: user.name })}</h1>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">
-            <span className="truncate">{user.email}</span>
-            {user.emailVerifiedAt && (
-              <span className="inline-flex items-center gap-1 font-medium text-leaf">
-                <BadgeCheck className="h-4 w-4" aria-hidden="true" />
-                {t("dashboard.verifiedBadge")}
-              </span>
-            )}
-          </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Avatar name={user.name} imageId={user.profileImageId} size="lg" />
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-semibold text-navy sm:text-3xl">{t("dashboard.greeting", { name: user.name })}</h1>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">
+              {user.username && <span className="font-semibold text-navy">@{user.username}</span>}
+              <span className="truncate">{user.email}</span>
+              {user.emailVerifiedAt && (
+                <span className="inline-flex items-center gap-1 font-medium text-leaf">
+                  <BadgeCheck className="h-4 w-4" aria-hidden="true" />
+                  {t("dashboard.verifiedBadge")}
+                </span>
+              )}
+            </p>
+          </div>
         </div>
+        {user.username && (
+          <Link href={`/u/${user.username}`} className="btn btn-outline btn-sm self-start sm:self-center">
+            {t("dashboard.viewPublicProfile")}
+          </Link>
+        )}
       </div>
 
       {!user.emailVerifiedAt && (
@@ -150,6 +158,31 @@ export default async function DashboardPage() {
               <ImageInput name="image" label={t("dashboard.photo")} currentUrl={user.profileImageId ? imageUrl(user.profileImageId, true) : null} shape="avatar" />
               <Field label={t("auth.name")}>
                 <input name="name" defaultValue={user.name} required maxLength={80} autoComplete="name" className="input" />
+              </Field>
+              <Field label={t("dashboard.username")} hint={t("dashboard.usernameHint")}>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-semibold text-muted">@</span>
+                  <input
+                    name="username"
+                    defaultValue={user.username}
+                    required
+                    minLength={3}
+                    maxLength={24}
+                    pattern="[a-z0-9_]{3,24}"
+                    autoComplete="username"
+                    className="input pl-8 lowercase"
+                  />
+                </div>
+              </Field>
+              <Field label={t("dashboard.bio")} hint={t("dashboard.bioHint")}>
+                <textarea
+                  name="bio"
+                  rows={3}
+                  maxLength={300}
+                  defaultValue={user.bio ?? ""}
+                  placeholder={t("dashboard.bioPlaceholder")}
+                  className="input"
+                />
               </Field>
               <Field label={t("auth.phone")}>
                 <input name="phone" type="tel" defaultValue={user.phone} required autoComplete="tel" className="input" />

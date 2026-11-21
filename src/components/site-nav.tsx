@@ -7,7 +7,7 @@ import { logoutAction, setLocaleAction } from "@/app/actions/auth";
 import { Avatar, KolamMark } from "./brand";
 import { useLocale, useT } from "./i18n-provider";
 
-type NavUser = { name: string; role: string; profileImageId: string | null } | null;
+type NavUser = { name: string; username?: string | null; role: string; profileImageId: string | null } | null;
 
 export function LanguageSwitcher({ dark = false }: { dark?: boolean }) {
   const t = useT();

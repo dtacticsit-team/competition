@@ -181,7 +181,13 @@
     "profileTitle": "Profile",
     "photo": "Profile photo",
     "profileSaved": "Profile saved.",
-    "likeOne": "like"
+    "likeOne": "like",
+    "viewPublicProfile": "View public profile",
+    "username": "Username",
+    "usernameHint": "3–24 characters: lowercase letters, numbers, or underscores.",
+    "bio": "Bio",
+    "bioHint": "A short introduction about yourself and your art (up to 300 characters).",
+    "bioPlaceholder": "Tell the community about your Kolam journey, style, and traditions..."
   },
   "auth": {
     "loginTitle": "Welcome back",
@@ -249,7 +255,26 @@
     "endInPast": "The end time has already passed. Choose a later end time.",
     "competitionLocked": "This competition has ended or was cancelled and can no longer be edited.",
     "sponsorName": "Enter the sponsor's name (2–100 characters).",
-    "prizeInvalid": "Enter whole rupee amounts of zero or more."
+    "prizeInvalid": "Enter whole rupee amounts of zero or more.",
+    "username": "Username must be 3–24 characters using lowercase letters, numbers, or underscores.",
+    "usernameTaken": "This username is already taken. Please choose another.",
+    "usernameReserved": "This username is reserved. Please choose another.",
+    "bioLong": "Bio cannot exceed 300 characters."
+  },
+  "profile": {
+    "title": "Creator Profile",
+    "metaDescription": "Explore public Kolam creations, competition entries, and artistic portfolio by {name} (@{username}) on KolamFest.",
+    "editProfile": "Edit Profile",
+    "noBio": "No bio added yet.",
+    "joined": "Joined {date}",
+    "posts": "posts",
+    "postOne": "post",
+    "competitions": "competitions",
+    "competitionOne": "competition",
+    "awardsTitle": "Competition Honors & Awards",
+    "galleryTitle": "Published Kolams",
+    "noPostsTitle": "No public posts yet",
+    "noPostsText": "This creator hasn't published any Kolams yet."
   },
   "admin": {
     "dashboard": "Dashboard",

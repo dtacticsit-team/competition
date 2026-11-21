@@ -16,6 +16,7 @@ export type FeedItem = {
   imageId: string;
   dateLabel: string;
   userName: string;
+  userUsername: string;
   userImageId: string | null;
   competitionId: string;
   competitionTitle: string;
@@ -28,6 +29,8 @@ type ListOptions = {
   locale: Locale;
   competitionId?: string;
   id?: string;
+  userId?: string;
+  username?: string;
   limit?: number;
   offset?: number;
   order?: "latest" | "top";
@@ -42,6 +45,8 @@ export async function listSubmissions(o: ListOptions): Promise<FeedItem[]> {
   const conds = [inArray(competitions.status, PUBLIC_STATUSES)];
   if (o.competitionId) conds.push(eq(submissions.competitionId, o.competitionId));
   if (o.id) conds.push(eq(submissions.id, o.id));
+  if (o.userId) conds.push(eq(submissions.userId, o.userId));
+  if (o.username) conds.push(eq(users.username, o.username));
   const rows = await db
     .select({
       id: submissions.id,
@@ -50,6 +55,7 @@ export async function listSubmissions(o: ListOptions): Promise<FeedItem[]> {
       imageId: submissions.imageId,
       submittedAt: submissions.submittedAt,
       userName: users.name,
+      userUsername: users.username,
       userImageId: users.profileImageId,
       competitionId: competitions.id,
       competitionTitle: competitions.title,

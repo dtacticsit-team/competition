@@ -34,6 +34,8 @@ export const images = pgTable("images", {
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  username: text("username").notNull().unique(),
+  bio: text("bio"),
   email: text("email").notNull().unique(),
   phone: text("phone").notNull(),
   passwordHash: text("password_hash").notNull(),
