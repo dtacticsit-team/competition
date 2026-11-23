@@ -232,6 +232,53 @@ export default async function CompetitionPage({ params }: Props) {
             </section>
           )}
 
+          {(c.proofStartImageId || c.proofMidImageId || c.proofEndImageId) && (
+            <section aria-labelledby="proof-title">
+              <h2 id="proof-title" className="text-2xl font-semibold text-navy">
+                {t("competition.proofGuidelines")}
+              </h2>
+              <p className="mt-1 text-sm text-muted">{t("competition.proofGuidelinesHint")}</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                {c.proofStartImageId && (
+                  <div className="card overflow-hidden">
+                    <div className="relative aspect-square bg-sand">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imageUrl(c.proofStartImageId, true)} alt={t("competition.proofStageStart")} loading="lazy" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm font-semibold text-navy">{t("competition.proofStageStart")}</p>
+                      <p className="text-xs text-muted">{t("competition.proofStageStartDesc")}</p>
+                    </div>
+                  </div>
+                )}
+                {c.proofMidImageId && (
+                  <div className="card overflow-hidden">
+                    <div className="relative aspect-square bg-sand">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imageUrl(c.proofMidImageId, true)} alt={t("competition.proofStageMid")} loading="lazy" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm font-semibold text-navy">{t("competition.proofStageMid")}</p>
+                      <p className="text-xs text-muted">{t("competition.proofStageMidDesc")}</p>
+                    </div>
+                  </div>
+                )}
+                {c.proofEndImageId && (
+                  <div className="card overflow-hidden">
+                    <div className="relative aspect-square bg-sand">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imageUrl(c.proofEndImageId, true)} alt={t("competition.proofStageEnd")} loading="lazy" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm font-semibold text-navy">{t("competition.proofStageEnd")}</p>
+                      <p className="text-xs text-muted">{t("competition.proofStageEndDesc")}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
           {phase !== "cancelled" && phase !== "upcoming" && (
             <section aria-labelledby="leaderboard-title">
               <div className="flex flex-wrap items-baseline justify-between gap-2">

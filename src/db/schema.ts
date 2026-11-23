@@ -86,6 +86,9 @@ export const competitions = pgTable(
     endAt: ts("end_at").notNull(),
     status: text("status").notNull().default("draft"), // draft | published | closed | cancelled
     rules: text("rules").notNull().default(""),
+    proofStartImageId: uuid("proof_start_image_id").references(() => images.id, { onDelete: "set null" }),
+    proofMidImageId: uuid("proof_mid_image_id").references(() => images.id, { onDelete: "set null" }),
+    proofEndImageId: uuid("proof_end_image_id").references(() => images.id, { onDelete: "set null" }),
     prizeInfo: text("prize_info").notNull().default(""),
     finalizedAt: ts("finalized_at"),
     resultsPublishedAt: ts("results_published_at"),

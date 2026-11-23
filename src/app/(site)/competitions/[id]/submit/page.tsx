@@ -57,6 +57,48 @@ export default async function SubmitPage({ params }: { params: Promise<{ id: str
       <h1 className="mt-4 text-3xl font-semibold text-navy">{existing ? t("submit.titleEdit") : t("submit.titleNew")}</h1>
       <p className="mt-2 text-[15px] text-muted">{t("submit.intro", { date: `${fmtDateTime(c.endAt, locale)} ${t("competition.ist")}` })}</p>
 
+      {(c.proofStartImageId || c.proofMidImageId || c.proofEndImageId) && (
+        <div className="card mt-6 border-line bg-sand/30 p-4 sm:p-5">
+          <h2 className="text-sm font-semibold text-navy">{t("submit.proofGuideTitle")}</h2>
+          <p className="mt-1 text-xs text-muted">{t("submit.proofGuideHint")}</p>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            {c.proofStartImageId && (
+              <div className="overflow-hidden rounded-xl border border-line bg-white">
+                <div className="aspect-square bg-sand">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imageUrl(c.proofStartImageId, true)} alt={t("competition.proofStageStart")} className="h-full w-full object-cover" />
+                </div>
+                <div className="p-2 text-center">
+                  <p className="text-xs font-semibold text-navy">{t("competition.proofStageStart")}</p>
+                </div>
+              </div>
+            )}
+            {c.proofMidImageId && (
+              <div className="overflow-hidden rounded-xl border border-line bg-white">
+                <div className="aspect-square bg-sand">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imageUrl(c.proofMidImageId, true)} alt={t("competition.proofStageMid")} className="h-full w-full object-cover" />
+                </div>
+                <div className="p-2 text-center">
+                  <p className="text-xs font-semibold text-navy">{t("competition.proofStageMid")}</p>
+                </div>
+              </div>
+            )}
+            {c.proofEndImageId && (
+              <div className="overflow-hidden rounded-xl border border-line bg-white">
+                <div className="aspect-square bg-sand">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imageUrl(c.proofEndImageId, true)} alt={t("competition.proofStageEnd")} className="h-full w-full object-cover" />
+                </div>
+                <div className="p-2 text-center">
+                  <p className="text-xs font-semibold text-navy">{t("competition.proofStageEnd")}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="card mt-6 p-5 sm:p-7">
         <ActionForm
           action={saveSubmissionAction}

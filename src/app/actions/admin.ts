@@ -62,11 +62,48 @@ export async function saveCompetitionAction(_: FormState, fd: FormData): Promise
     bannerImageId = saved.id;
   }
 
-  const values = { ...parsed.data, startAt, endAt, status, bannerImageId, updatedAt: new Date() };
+  let proofStartImageId = existing?.proofStartImageId ?? null;
+  const fileProofStart = fd.get("proofStart");
+  if (hasFile(fileProofStart)) {
+    const saved = await saveImage(fileProofStart, 1600);
+    if ("error" in saved) return saved;
+    proofStartImageId = saved.id;
+  }
+
+  let proofMidImageId = existing?.proofMidImageId ?? null;
+  const fileProofMid = fd.get("proofMid");
+  if (hasFile(fileProofMid)) {
+    const saved = await saveImage(fileProofMid, 1600);
+    if ("error" in saved) return saved;
+    proofMidImageId = saved.id;
+  }
+
+  let proofEndImageId = existing?.proofEndImageId ?? null;
+  const fileProofEnd = fd.get("proofEnd");
+  if (hasFile(fileProofEnd)) {
+    const saved = await saveImage(fileProofEnd, 1600);
+    if ("error" in saved) return saved;
+    proofEndImageId = saved.id;
+  }
+
+  const values = {
+    ...parsed.data,
+    startAt,
+    endAt,
+    status,
+    bannerImageId,
+    proofStartImageId,
+    proofMidImageId,
+    proofEndImageId,
+    updatedAt: new Date(),
+  };
   let savedId = existing?.id;
   if (existing) {
     await db.update(competitions).set(values).where(eq(competitions.id, existing.id));
     if (bannerImageId !== existing.bannerImageId) await deleteImage(existing.bannerImageId);
+    if (proofStartImageId !== existing.proofStartImageId) await deleteImage(existing.proofStartImageId);
+    if (proofMidImageId !== existing.proofMidImageId) await deleteImage(existing.proofMidImageId);
+    if (proofEndImageId !== existing.proofEndImageId) await deleteImage(existing.proofEndImageId);
   } else {
     const [row] = await db.insert(competitions).values(values).returning({ id: competitions.id });
     savedId = row.id;

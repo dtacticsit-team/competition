@@ -56,6 +56,33 @@ export async function CompetitionForm({ c }: { c?: Competition }) {
             <Field label={`${t("compForm.rules")} (${t("common.optional")})`} hint={t("compForm.rulesHint")}>
               <textarea name="rules" rows={5} maxLength={5000} defaultValue={c?.rules ?? ""} className="input" />
             </Field>
+
+            <div className="rounded-2xl border border-line bg-sand/30 p-4 sm:p-5">
+              <div>
+                <h3 className="text-sm font-semibold text-navy">{t("compForm.proofTitle")}</h3>
+                <p className="mt-0.5 text-xs text-muted">{t("compForm.proofHint")}</p>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <ImageInput
+                  name="proofStart"
+                  label={t("compForm.proofStart")}
+                  currentUrl={c?.proofStartImageId ? imageUrl(c.proofStartImageId, true) : null}
+                  shape="square"
+                />
+                <ImageInput
+                  name="proofMid"
+                  label={t("compForm.proofMid")}
+                  currentUrl={c?.proofMidImageId ? imageUrl(c.proofMidImageId, true) : null}
+                  shape="square"
+                />
+                <ImageInput
+                  name="proofEnd"
+                  label={t("compForm.proofEnd")}
+                  currentUrl={c?.proofEndImageId ? imageUrl(c.proofEndImageId, true) : null}
+                  shape="square"
+                />
+              </div>
+            </div>
             <Field label={`${t("compForm.prizeInfo")} (${t("common.optional")})`} hint={t("compForm.prizeInfoHint")}>
               <textarea name="prizeInfo" rows={2} maxLength={1000} defaultValue={c?.prizeInfo ?? ""} className="input" />
             </Field>
