@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { competitions, designReferences, prizeConfiguration, sponsors, submissions, votes, winners } from "@/db/schema";
+import { getAppId } from "@/lib/app-config";
 import { requireAdmin } from "@/lib/auth";
 import { audit, processLifecycle, recalculateWinners } from "@/lib/competitions";
 import { parseIstLocal } from "@/lib/format";
@@ -28,6 +29,7 @@ const competitionSchema = z.object({
 
 export async function saveCompetitionAction(_: FormState, fd: FormData): Promise<FormState> {
   const admin = await requireAdmin();
+  const appId = getAppId();
   await processLifecycle(); // make sure an ended competition is locked before it can be edited
   const id = str(fd, "id");
   const publish = str(fd, "intent") === "publish";
@@ -47,7 +49,10 @@ export async function saveCompetitionAction(_: FormState, fd: FormData): Promise
   let existing: typeof competitions.$inferSelect | undefined;
   if (id) {
     if (!isUuid(id)) return { error: "errors.generic" };
-    [existing] = await db.select().from(competitions).where(eq(competitions.id, id));
+    [existing] = await db
+      .select()
+      .from(competitions)
+      .where(and(eq(competitions.id, id), eq(competitions.appId, appId)));
     if (!existing) return { error: "errors.generic" };
     if (existing.status === "cancelled" || existing.finalizedAt) return { error: "errors.competitionLocked" };
   }
@@ -99,65 +104,87 @@ export async function saveCompetitionAction(_: FormState, fd: FormData): Promise
   };
   let savedId = existing?.id;
   if (existing) {
-    await db.update(competitions).set(values).where(eq(competitions.id, existing.id));
+    await db
+      .update(competitions)
+      .set(values)
+      .where(and(eq(competitions.id, existing.id), eq(competitions.appId, appId)));
     if (bannerImageId !== existing.bannerImageId) await deleteImage(existing.bannerImageId);
     if (proofStartImageId !== existing.proofStartImageId) await deleteImage(existing.proofStartImageId);
     if (proofMidImageId !== existing.proofMidImageId) await deleteImage(existing.proofMidImageId);
     if (proofEndImageId !== existing.proofEndImageId) await deleteImage(existing.proofEndImageId);
   } else {
-    const [row] = await db.insert(competitions).values(values).returning({ id: competitions.id });
+    const [row] = await db.insert(competitions).values({ ...values, appId }).returning({ id: competitions.id });
     savedId = row.id;
   }
   const action = !existing ? "competition.created" : publish && existing.status !== "published" ? "competition.published" : "competition.updated";
-  await audit(admin.id, action, "competition", savedId, { status, startAt, endAt });
+  await audit(admin.id, action, "competition", savedId, { appId, status, startAt, endAt });
   revalidatePath("/", "layout");
   redirect("/admin");
 }
 
 export async function cancelCompetitionAction(fd: FormData) {
   const admin = await requireAdmin();
+  const appId = getAppId();
   const id = str(fd, "id");
   if (!isUuid(id)) return;
-  const [c] = await db.select().from(competitions).where(eq(competitions.id, id));
+  const [c] = await db
+    .select()
+    .from(competitions)
+    .where(and(eq(competitions.id, id), eq(competitions.appId, appId)));
   if (!c || c.resultsPublishedAt || c.status === "cancelled") return;
-  await db.update(competitions).set({ status: "cancelled", updatedAt: new Date() }).where(eq(competitions.id, id));
-  await audit(admin.id, "competition.cancelled", "competition", id, { previousStatus: c.status });
+  await db
+    .update(competitions)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(and(eq(competitions.id, id), eq(competitions.appId, appId)));
+  await audit(admin.id, "competition.cancelled", "competition", id, { appId, previousStatus: c.status });
   revalidatePath("/", "layout");
 }
 
 /** Final rankings stay private until an admin approves them here. */
 export async function approveResultsAction(fd: FormData) {
   const admin = await requireAdmin();
+  const appId = getAppId();
   const id = str(fd, "id");
   if (!isUuid(id)) return;
   await db.transaction(async (tx) => {
-    const [c] = await tx.select().from(competitions).where(eq(competitions.id, id)).for("update");
+    const [c] = await tx
+      .select()
+      .from(competitions)
+      .where(and(eq(competitions.id, id), eq(competitions.appId, appId)))
+      .for("update");
     if (!c || !c.finalizedAt || c.resultsPublishedAt || c.status !== "closed") return;
     const now = new Date();
-    await tx.update(winners).set({ publishedAt: now }).where(eq(winners.competitionId, id));
-    await tx.update(competitions).set({ resultsPublishedAt: now, updatedAt: now }).where(eq(competitions.id, id));
+    await tx
+      .update(winners)
+      .set({ publishedAt: now })
+      .where(and(eq(winners.competitionId, id), eq(winners.appId, appId)));
+    await tx
+      .update(competitions)
+      .set({ resultsPublishedAt: now, updatedAt: now })
+      .where(and(eq(competitions.id, id), eq(competitions.appId, appId)));
   });
-  await audit(admin.id, "results.approved", "competition", id);
+  await audit(admin.id, "results.approved", "competition", id, { appId });
   revalidatePath("/", "layout");
 }
 
 /** Vote moderation: exclude or restore the flagged likes of one entry. */
 export async function setFlaggedVotesAction(fd: FormData) {
   const admin = await requireAdmin();
+  const appId = getAppId();
   const submissionId = str(fd, "submissionId");
   const eligible = str(fd, "eligible") === "true";
   const [row] = await db
     .select({ competitionId: submissions.competitionId, resultsPublishedAt: competitions.resultsPublishedAt })
     .from(submissions)
     .innerJoin(competitions, eq(competitions.id, submissions.competitionId))
-    .where(eq(submissions.id, submissionId));
+    .where(and(eq(submissions.id, submissionId), eq(submissions.appId, appId), eq(competitions.appId, appId)));
   if (!row || row.resultsPublishedAt) return;
   const changed = await db
     .update(votes)
     .set({ eligible })
-    .where(and(eq(votes.submissionId, submissionId), eq(votes.suspicious, true)))
+    .where(and(eq(votes.appId, appId), eq(votes.submissionId, submissionId), eq(votes.suspicious, true)))
     .returning({ id: votes.id });
-  await audit(admin.id, eligible ? "votes.restored" : "votes.excluded", "submission", submissionId, { votes: changed.length });
+  await audit(admin.id, eligible ? "votes.restored" : "votes.excluded", "submission", submissionId, { appId, votes: changed.length });
   await recalculateWinners(row.competitionId);
   revalidatePath("/", "layout");
 }
@@ -171,6 +198,7 @@ const sponsorSchema = z.object({
 
 export async function saveSponsorAction(_: FormState, fd: FormData): Promise<FormState> {
   const admin = await requireAdmin();
+  const appId = getAppId();
   const id = str(fd, "id");
   const parsed = sponsorSchema.safeParse({ name: str(fd, "name"), description: str(fd, "description") });
   if (!parsed.success) return { error: firstError(parsed.error) };
@@ -180,7 +208,10 @@ export async function saveSponsorAction(_: FormState, fd: FormData): Promise<For
 
   if (id) {
     if (!isUuid(id)) return { error: "errors.generic" };
-    const [existing] = await db.select().from(sponsors).where(eq(sponsors.id, id));
+    const [existing] = await db
+      .select()
+      .from(sponsors)
+      .where(and(eq(sponsors.id, id), eq(sponsors.appId, appId)));
     if (!existing) return { error: "errors.generic" };
     let imageId = existing.imageId;
     if (hasFile(file)) {
@@ -188,14 +219,17 @@ export async function saveSponsorAction(_: FormState, fd: FormData): Promise<For
       if ("error" in saved) return saved;
       imageId = saved.id;
     }
-    await db.update(sponsors).set({ name, description, imageId, updatedAt: new Date() }).where(eq(sponsors.id, id));
+    await db
+      .update(sponsors)
+      .set({ name, description, imageId, updatedAt: new Date() })
+      .where(and(eq(sponsors.id, id), eq(sponsors.appId, appId)));
     if (imageId !== existing.imageId) await deleteImage(existing.imageId);
-    await audit(admin.id, "sponsor.updated", "sponsor", id);
+    await audit(admin.id, "sponsor.updated", "sponsor", id, { appId });
   } else {
     const saved = await saveImage(file, 800);
     if ("error" in saved) return saved;
-    const [row] = await db.insert(sponsors).values({ name, description, imageId: saved.id }).returning({ id: sponsors.id });
-    await audit(admin.id, "sponsor.created", "sponsor", row.id);
+    const [row] = await db.insert(sponsors).values({ appId, name, description, imageId: saved.id }).returning({ id: sponsors.id });
+    await audit(admin.id, "sponsor.created", "sponsor", row.id, { appId });
   }
   revalidatePath("/", "layout");
   redirect("/admin/sponsors");
@@ -203,12 +237,16 @@ export async function saveSponsorAction(_: FormState, fd: FormData): Promise<For
 
 export async function deleteSponsorAction(fd: FormData) {
   const admin = await requireAdmin();
+  const appId = getAppId();
   const id = str(fd, "id");
   if (!isUuid(id)) return;
-  const [row] = await db.delete(sponsors).where(eq(sponsors.id, id)).returning({ imageId: sponsors.imageId });
+  const [row] = await db
+    .delete(sponsors)
+    .where(and(eq(sponsors.id, id), eq(sponsors.appId, appId)))
+    .returning({ imageId: sponsors.imageId });
   if (row) {
     await deleteImage(row.imageId);
-    await audit(admin.id, "sponsor.deleted", "sponsor", id);
+    await audit(admin.id, "sponsor.deleted", "sponsor", id, { appId });
   }
   revalidatePath("/", "layout");
 }
@@ -219,13 +257,17 @@ const amount = z.coerce.number("errors.prizeInvalid").int("errors.prizeInvalid")
 
 export async function savePrizesAction(_: FormState, fd: FormData): Promise<FormState> {
   const admin = await requireAdmin();
+  const appId = getAppId();
   const parsed = z
     .object({ firstPrize: amount, secondPrize: amount, thirdPrize: amount })
     .safeParse({ firstPrize: str(fd, "firstPrize"), secondPrize: str(fd, "secondPrize"), thirdPrize: str(fd, "thirdPrize") });
   if (!parsed.success) return { error: "errors.prizeInvalid" };
   const values = { ...parsed.data, updatedAt: new Date() };
-  await db.insert(prizeConfiguration).values({ id: 1, ...values }).onConflictDoUpdate({ target: prizeConfiguration.id, set: values });
-  await audit(admin.id, "prizes.updated", "prize_configuration", "1", parsed.data);
+  await db
+    .insert(prizeConfiguration)
+    .values({ id: appId, appId, ...values })
+    .onConflictDoUpdate({ target: prizeConfiguration.appId, set: values });
+  await audit(admin.id, "prizes.updated", "prize_configuration", String(appId), { appId, ...parsed.data });
   revalidatePath("/", "layout");
   return { ok: "admin.prizesSaved" };
 }
@@ -235,6 +277,7 @@ export async function savePrizesAction(_: FormState, fd: FormData): Promise<Form
 /** Upload one reference image, or replace an existing one when `replaceId` is set. */
 export async function uploadReferenceAction(fd: FormData): Promise<{ ok: true } | { error: string }> {
   await requireAdmin();
+  const appId = getAppId();
   const section = str(fd, "section");
   const replaceId = str(fd, "replaceId");
   const file = fd.get("file");
@@ -245,15 +288,21 @@ export async function uploadReferenceAction(fd: FormData): Promise<{ ok: true } 
 
   if (replaceId) {
     if (!isUuid(replaceId)) return { error: "errors.generic" };
-    const [existing] = await db.select().from(designReferences).where(eq(designReferences.id, replaceId));
+    const [existing] = await db
+      .select()
+      .from(designReferences)
+      .where(and(eq(designReferences.id, replaceId), eq(designReferences.appId, appId)));
     if (!existing) {
       await deleteImage(saved.id);
       return { error: "errors.generic" };
     }
-    await db.update(designReferences).set({ imageId: saved.id, fileName, updatedAt: new Date() }).where(eq(designReferences.id, replaceId));
+    await db
+      .update(designReferences)
+      .set({ imageId: saved.id, fileName, updatedAt: new Date() })
+      .where(and(eq(designReferences.id, replaceId), eq(designReferences.appId, appId)));
     await deleteImage(existing.imageId);
   } else {
-    await db.insert(designReferences).values({ section, imageId: saved.id, fileName });
+    await db.insert(designReferences).values({ appId, section, imageId: saved.id, fileName });
   }
   revalidatePath("/admin/references");
   return { ok: true };
@@ -261,19 +310,27 @@ export async function uploadReferenceAction(fd: FormData): Promise<{ ok: true } 
 
 export async function updateReferenceAction(fd: FormData) {
   await requireAdmin();
+  const appId = getAppId();
   const id = str(fd, "id");
   const section = str(fd, "section");
   if (!isUuid(id) || !isReferenceSection(section)) return;
   const note = str(fd, "note").trim().slice(0, 500) || null;
-  await db.update(designReferences).set({ section, note, updatedAt: new Date() }).where(eq(designReferences.id, id));
+  await db
+    .update(designReferences)
+    .set({ section, note, updatedAt: new Date() })
+    .where(and(eq(designReferences.id, id), eq(designReferences.appId, appId)));
   revalidatePath("/admin/references");
 }
 
 export async function deleteReferenceAction(fd: FormData) {
   await requireAdmin();
+  const appId = getAppId();
   const id = str(fd, "id");
   if (!isUuid(id)) return;
-  const [row] = await db.delete(designReferences).where(eq(designReferences.id, id)).returning({ imageId: designReferences.imageId });
+  const [row] = await db
+    .delete(designReferences)
+    .where(and(eq(designReferences.id, id), eq(designReferences.appId, appId)))
+    .returning({ imageId: designReferences.imageId });
   if (row) await deleteImage(row.imageId);
   revalidatePath("/admin/references");
 }

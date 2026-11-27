@@ -7,32 +7,38 @@ import { StatusPill } from "@/components/brand";
 import { ConfirmButton } from "@/components/forms";
 import { db } from "@/db";
 import { competitions, registrations, submissions, users, votes, winners } from "@/db/schema";
+import { getAppId } from "@/lib/app-config";
 import { getPhase, processLifecycle } from "@/lib/competitions";
 import { fmtDateTime, imageUrl, inr, num } from "@/lib/format";
 import { getT } from "@/lib/i18n";
 
 export default async function AdminDashboard() {
   await processLifecycle();
+  const appId = getAppId();
   const { t, locale } = await getT();
   const now = new Date();
   const [all, [{ participants }], totalEntries, totalLikes, pendingWinners, flagged] = await Promise.all([
     db
       .select({
         c: competitions,
-        participants: sql<number>`(select count(*)::int from registrations r where r.competition_id = "competitions"."id")`,
-        entries: sql<number>`(select count(*)::int from submissions s where s.competition_id = "competitions"."id")`,
+        participants: sql<number>`(select count(*)::int from registrations r where r.competition_id = "competitions"."id" and r.app_id = ${appId})`,
+        entries: sql<number>`(select count(*)::int from submissions s where s.competition_id = "competitions"."id" and s.app_id = ${appId})`,
       })
       .from(competitions)
+      .where(eq(competitions.appId, appId))
       .orderBy(desc(competitions.createdAt)),
-    db.select({ participants: sql<number>`count(distinct user_id)::int` }).from(registrations),
-    db.$count(submissions),
-    db.$count(votes, eq(votes.eligible, true)),
+    db
+      .select({ participants: sql<number>`count(distinct user_id)::int` })
+      .from(registrations)
+      .where(eq(registrations.appId, appId)),
+    db.$count(submissions, eq(submissions.appId, appId)),
+    db.$count(votes, and(eq(votes.appId, appId), eq(votes.eligible, true))),
     db
       .select({ competitionId: winners.competitionId, rank: winners.rank, likes: winners.finalLikes, prize: winners.prizeAmount, submissionId: winners.submissionId, name: users.name, imageId: submissions.imageId })
       .from(winners)
       .innerJoin(users, eq(users.id, winners.userId))
       .innerJoin(submissions, eq(submissions.id, winners.submissionId))
-      .where(isNull(winners.publishedAt))
+      .where(and(eq(winners.appId, appId), isNull(winners.publishedAt)))
       .orderBy(asc(winners.rank)),
     db
       .select({
@@ -47,7 +53,7 @@ export default async function AdminDashboard() {
       .innerJoin(submissions, eq(submissions.id, votes.submissionId))
       .innerJoin(users, eq(users.id, submissions.userId))
       .innerJoin(competitions, eq(competitions.id, submissions.competitionId))
-      .where(and(eq(votes.suspicious, true), isNull(competitions.resultsPublishedAt)))
+      .where(and(eq(votes.appId, appId), eq(votes.suspicious, true), isNull(competitions.resultsPublishedAt)))
       .groupBy(votes.submissionId, users.name, submissions.imageId, competitions.title),
   ]);
 

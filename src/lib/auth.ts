@@ -5,6 +5,7 @@ import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
+import { COOKIE_DOMAIN } from "./app-config";
 import { isHttps } from "./request";
 
 const SESSION_COOKIE = "kolam_session";
@@ -159,6 +160,7 @@ export async function createSession(userId: string) {
     sameSite: "lax",
     secure: await isHttps(),
     path: "/",
+    ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
     expires: expiresAt,
   });
 }
@@ -167,7 +169,14 @@ export async function destroySession() {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (token) await db.delete(sessions).where(eq(sessions.tokenHash, sha256(token)));
-  store.delete(SESSION_COOKIE);
+  store.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: await isHttps(),
+    path: "/",
+    ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
+    maxAge: 0,
+  });
 }
 
 export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {

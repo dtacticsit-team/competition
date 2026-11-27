@@ -9,6 +9,7 @@ import { Avatar, StatusPill } from "@/components/brand";
 import { Countdown, Feed } from "@/components/feed";
 import { db } from "@/db";
 import { competitions, registrations, submissions, users, winners } from "@/db/schema";
+import { getAppId } from "@/lib/app-config";
 import { getCurrentUser } from "@/lib/auth";
 import { getPhase, getPrizes, processLifecycle } from "@/lib/competitions";
 import { fmtDateTime, imageUrl, inr, num, toLines } from "@/lib/format";
@@ -20,7 +21,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 async function load(id: string) {
   if (!UUID_RE.test(id)) return null;
-  const [c] = await db.select().from(competitions).where(eq(competitions.id, id));
+  const appId = getAppId();
+  const [c] = await db
+    .select()
+    .from(competitions)
+    .where(and(eq(competitions.id, id), eq(competitions.appId, appId)));
   return c && c.status !== "draft" ? c : null;
 }
 

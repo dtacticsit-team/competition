@@ -4,6 +4,7 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { competitions, submissions, voteEvents, votes } from "@/db/schema";
+import { getAppId } from "@/lib/app-config";
 import { isOpen } from "@/lib/competitions";
 import { rateLimit } from "@/lib/rate-limit";
 import { getClientIp, getVisitorId, hashIp, isHttps, VISITOR_COOKIE } from "@/lib/request";
@@ -46,11 +47,12 @@ export async function POST(req: Request) {
   if (!parsed.success) return fail("invalid", 400);
   const { submissionId, like } = parsed.data;
 
+  const appId = getAppId();
   const [entry] = await db
     .select({ status: competitions.status, startAt: competitions.startAt, endAt: competitions.endAt })
     .from(submissions)
     .innerJoin(competitions, eq(competitions.id, submissions.competitionId))
-    .where(eq(submissions.id, submissionId));
+    .where(and(eq(submissions.id, submissionId), eq(submissions.appId, appId), eq(competitions.appId, appId)));
   if (!entry) return fail("notfound", 404);
   // Voting freezes at the exact end timestamp, judged by the server clock.
   if (!isOpen(entry)) return fail("closed", 409);
@@ -58,13 +60,13 @@ export async function POST(req: Request) {
   let visitorId = await getVisitorId();
   const isNewVisitor = !visitorId;
   if (!visitorId) visitorId = randomBytes(18).toString("base64url");
-  const event = (action: string) => db.insert(voteEvents).values({ submissionId, voterId: visitorId, ipHash, action });
+  const event = (action: string) => db.insert(voteEvents).values({ appId, submissionId, voterId: visitorId, ipHash, action });
 
   if (like) {
     const [{ recent }] = await db
       .select({ recent: sql<number>`count(*)::int` })
       .from(votes)
-      .where(and(eq(votes.submissionId, submissionId), eq(votes.ipHash, ipHash), gt(votes.createdAt, new Date(Date.now() - DAY_MS))));
+      .where(and(eq(votes.appId, appId), eq(votes.submissionId, submissionId), eq(votes.ipHash, ipHash), gt(votes.createdAt, new Date(Date.now() - DAY_MS))));
     if (recent >= IP_CAP) {
       await event("blocked");
       return fail("limit", 429);
@@ -72,14 +74,14 @@ export async function POST(req: Request) {
     const suspicious = recent >= FLAG_AT;
     const inserted = await db
       .insert(votes)
-      .values({ submissionId, voterId: visitorId, ipHash, suspicious })
+      .values({ appId, submissionId, voterId: visitorId, ipHash, suspicious })
       .onConflictDoNothing()
       .returning({ id: votes.id });
     if (inserted.length) await event(suspicious ? "flagged" : "like");
   } else {
     const removed = await db
       .delete(votes)
-      .where(and(eq(votes.submissionId, submissionId), eq(votes.voterId, visitorId)))
+      .where(and(eq(votes.appId, appId), eq(votes.submissionId, submissionId), eq(votes.voterId, visitorId)))
       .returning({ id: votes.id });
     if (removed.length) await event("unlike");
   }
@@ -88,7 +90,7 @@ export async function POST(req: Request) {
   const [{ likes }] = await db
     .select({ likes: sql<number>`count(*)::int` })
     .from(votes)
-    .where(and(eq(votes.submissionId, submissionId), eq(votes.eligible, true)));
+    .where(and(eq(votes.appId, appId), eq(votes.submissionId, submissionId), eq(votes.eligible, true)));
 
   const res = NextResponse.json({ likes, liked: like });
   if (isNewVisitor) {

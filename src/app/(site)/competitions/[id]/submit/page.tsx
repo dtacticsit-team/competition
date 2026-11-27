@@ -8,6 +8,7 @@ import { EmptyState, Field } from "@/components/blocks";
 import { ActionForm, ImageInput } from "@/components/forms";
 import { db } from "@/db";
 import { competitions, registrations, submissions } from "@/db/schema";
+import { getAppId } from "@/lib/app-config";
 import { requireUser } from "@/lib/auth";
 import { isOpen } from "@/lib/competitions";
 import { fmtDateTime, imageUrl } from "@/lib/format";
@@ -20,7 +21,11 @@ export default async function SubmitPage({ params }: { params: Promise<{ id: str
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const user = await requireUser(`/competitions/${id}/submit`);
   const { t, locale } = await getT();
-  const [c] = await db.select().from(competitions).where(eq(competitions.id, id));
+  const appId = getAppId();
+  const [c] = await db
+    .select()
+    .from(competitions)
+    .where(and(eq(competitions.id, id), eq(competitions.appId, appId)));
   if (!c || c.status === "draft") notFound();
 
   const back = (

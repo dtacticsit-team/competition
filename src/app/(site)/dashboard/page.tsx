@@ -8,6 +8,7 @@ import { Avatar, StatusPill } from "@/components/brand";
 import { ActionForm, ImageInput } from "@/components/forms";
 import { db } from "@/db";
 import { competitions, registrations, submissions, winners } from "@/db/schema";
+import { getAppId } from "@/lib/app-config";
 import { requireUser } from "@/lib/auth";
 import { eligibleLikes, getPhase, processLifecycle } from "@/lib/competitions";
 import { fmtDateTime, imageUrl, inr, num } from "@/lib/format";
@@ -22,6 +23,7 @@ export default async function DashboardPage() {
   const user = await requireUser("/dashboard");
   await processLifecycle();
   const { t, locale } = await getT();
+  const appId = getAppId();
   const rows = await db
     .select({
       c: competitions,
@@ -36,7 +38,7 @@ export default async function DashboardPage() {
     .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
     .leftJoin(submissions, and(eq(submissions.competitionId, registrations.competitionId), eq(submissions.userId, registrations.userId)))
     .leftJoin(winners, and(eq(winners.submissionId, submissions.id), isNotNull(winners.publishedAt)))
-    .where(eq(registrations.userId, user.id))
+    .where(and(eq(registrations.userId, user.id), eq(registrations.appId, appId), eq(competitions.appId, appId)))
     .orderBy(desc(registrations.registeredAt));
   const now = new Date();
 

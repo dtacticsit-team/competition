@@ -1,14 +1,16 @@
 import type { MetadataRoute } from "next";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { competitions, submissions } from "@/db/schema";
+import { getAppId } from "@/lib/app-config";
 import { getBaseUrl } from "@/lib/request";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const appId = getAppId();
   const base = await getBaseUrl();
-  const visible = inArray(competitions.status, ["published", "closed"]);
+  const visible = and(eq(competitions.appId, appId), inArray(competitions.status, ["published", "closed"]));
   const [comps, posts] = await Promise.all([
     db.select({ id: competitions.id, updatedAt: competitions.updatedAt }).from(competitions).where(visible),
     db

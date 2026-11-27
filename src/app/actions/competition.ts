@@ -7,6 +7,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { competitions, registrations, submissions } from "@/db/schema";
+import { getAppId } from "@/lib/app-config";
 import { requireUser } from "@/lib/auth";
 import { isOpen } from "@/lib/competitions";
 import type { FormState } from "@/lib/i18n-shared";
@@ -24,18 +25,20 @@ const entrySchema = z.object({
 
 /** Registration is open for the whole competition window, checked on the server clock. */
 export async function registerForCompetitionAction(fd: FormData) {
+  const appId = getAppId();
   const id = str(fd, "competitionId");
   if (!isUuid(id)) redirect("/competitions");
   const user = await requireUser(`/competitions/${id}`);
-  const [c] = await db.select().from(competitions).where(eq(competitions.id, id));
+  const [c] = await db.select().from(competitions).where(and(eq(competitions.id, id), eq(competitions.appId, appId)));
   if (!c || !isOpen(c)) redirect(`/competitions/${id}`);
-  await db.insert(registrations).values({ userId: user.id, competitionId: id }).onConflictDoNothing();
+  await db.insert(registrations).values({ appId, userId: user.id, competitionId: id }).onConflictDoNothing();
   revalidatePath(`/competitions/${id}`);
   redirect(`/competitions/${id}/submit`);
 }
 
 /** Creates the participant's single entry, or edits/replaces it until the deadline. */
 export async function saveSubmissionAction(_: FormState, fd: FormData): Promise<FormState> {
+  const appId = getAppId();
   const competitionId = str(fd, "competitionId");
   if (!isUuid(competitionId)) return { error: "errors.generic" };
   const user = await requireUser(`/competitions/${competitionId}/submit`);
@@ -46,16 +49,29 @@ export async function saveSubmissionAction(_: FormState, fd: FormData): Promise<
   const title = parsed.data.title || null;
   const description = parsed.data.description || null;
 
-  const [c] = await db.select().from(competitions).where(eq(competitions.id, competitionId));
+  const [c] = await db
+    .select()
+    .from(competitions)
+    .where(and(eq(competitions.id, competitionId), eq(competitions.appId, appId)));
   if (!c || !isOpen(c)) return { error: "errors.competitionClosed" };
-  const mine = and(eq(registrations.userId, user.id), eq(registrations.competitionId, competitionId));
+  const mine = and(
+    eq(registrations.userId, user.id),
+    eq(registrations.competitionId, competitionId),
+    eq(registrations.appId, appId),
+  );
   const [registration] = await db.select({ id: registrations.id }).from(registrations).where(mine);
   if (!registration) return { error: "errors.notRegistered" };
 
   const [existing] = await db
     .select()
     .from(submissions)
-    .where(and(eq(submissions.userId, user.id), eq(submissions.competitionId, competitionId)));
+    .where(
+      and(
+        eq(submissions.userId, user.id),
+        eq(submissions.competitionId, competitionId),
+        eq(submissions.appId, appId),
+      ),
+    );
   const file = fd.get("image");
   let postId: string;
 
@@ -83,7 +99,7 @@ export async function saveSubmissionAction(_: FormState, fd: FormData): Promise<
     }
     postId = shortId();
     try {
-      await db.insert(submissions).values({ id: postId, userId: user.id, competitionId, imageId: saved.id, title, description });
+      await db.insert(submissions).values({ appId, id: postId, userId: user.id, competitionId, imageId: saved.id, title, description });
     } catch {
       // The unique (user, competition) index rejected a duplicate entry.
       await deleteImage(saved.id);

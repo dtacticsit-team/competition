@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { asc, desc, eq, isNotNull } from "drizzle-orm";
+import { asc, desc, eq, isNotNull, and } from "drizzle-orm";
 import { Heart } from "lucide-react";
 import { EmptyState, RankBadge } from "@/components/blocks";
 import { db } from "@/db";
 import { competitions, submissions, users, winners } from "@/db/schema";
+import { getAppId } from "@/lib/app-config";
 import { processLifecycle } from "@/lib/competitions";
 import { fmtDate, imageUrl, inr, num } from "@/lib/format";
 import { getT } from "@/lib/i18n";
@@ -17,6 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function WinnersPage() {
   await processLifecycle();
   const { t, locale } = await getT();
+  const appId = getAppId();
   // Only results an admin has approved are ever shown here.
   const rows = await db
     .select({
@@ -35,7 +37,7 @@ export default async function WinnersPage() {
     .innerJoin(competitions, eq(competitions.id, winners.competitionId))
     .innerJoin(users, eq(users.id, winners.userId))
     .innerJoin(submissions, eq(submissions.id, winners.submissionId))
-    .where(isNotNull(winners.publishedAt))
+    .where(and(eq(winners.appId, appId), eq(competitions.appId, appId), isNotNull(winners.publishedAt)))
     .orderBy(desc(competitions.endAt), asc(winners.rank));
 
   const groups = new Map<string, typeof rows>();

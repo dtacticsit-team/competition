@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { competitions, sponsors, submissions, users } from "@/db/schema";
+import { getAppId } from "./app-config";
 import { eligibleLikes, isOpen } from "./competitions";
 import { fmtShort } from "./format";
 import type { Locale } from "./i18n-shared";
@@ -38,11 +39,12 @@ type ListOptions = {
 
 /** Public entries only (draft and cancelled competitions are excluded). */
 export async function listSubmissions(o: ListOptions): Promise<FeedItem[]> {
+  const appId = getAppId();
   const visitorId = await getVisitorId();
   const liked = visitorId
-    ? sql<boolean>`exists(select 1 from votes v2 where v2.submission_id = "submissions"."id" and v2.voter_id = ${visitorId})`
+    ? sql<boolean>`exists(select 1 from votes v2 where v2.submission_id = "submissions"."id" and v2.voter_id = ${visitorId} and v2.app_id = ${appId})`
     : sql<boolean>`false`;
-  const conds = [inArray(competitions.status, PUBLIC_STATUSES)];
+  const conds = [eq(submissions.appId, appId), eq(competitions.appId, appId), inArray(competitions.status, PUBLIC_STATUSES)];
   if (o.competitionId) conds.push(eq(submissions.competitionId, o.competitionId));
   if (o.id) conds.push(eq(submissions.id, o.id));
   if (o.userId) conds.push(eq(submissions.userId, o.userId));
@@ -85,20 +87,23 @@ export async function listSubmissions(o: ListOptions): Promise<FeedItem[]> {
 }
 
 export async function listPublicCompetitions() {
+  const appId = getAppId();
   return db
     .select({
       c: competitions,
-      participants: sql<number>`(select count(*)::int from registrations r where r.competition_id = "competitions"."id")`,
-      entries: sql<number>`(select count(*)::int from submissions s where s.competition_id = "competitions"."id")`,
+      participants: sql<number>`(select count(*)::int from registrations r where r.competition_id = "competitions"."id" and r.app_id = ${appId})`,
+      entries: sql<number>`(select count(*)::int from submissions s where s.competition_id = "competitions"."id" and s.app_id = ${appId})`,
     })
     .from(competitions)
-    .where(inArray(competitions.status, PUBLIC_STATUSES))
+    .where(and(eq(competitions.appId, appId), inArray(competitions.status, PUBLIC_STATUSES)))
     .orderBy(desc(competitions.startAt));
 }
 
 export async function listSponsors() {
+  const appId = getAppId();
   return db
     .select({ id: sponsors.id, name: sponsors.name, description: sponsors.description, imageId: sponsors.imageId })
     .from(sponsors)
+    .where(eq(sponsors.appId, appId))
     .orderBy(asc(sponsors.createdAt));
 }

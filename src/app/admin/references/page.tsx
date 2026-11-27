@@ -1,15 +1,18 @@
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { ReferenceManager, type ReferenceItem } from "@/components/reference-manager";
 import { db } from "@/db";
 import { designReferences } from "@/db/schema";
+import { getAppId } from "@/lib/app-config";
 import { getT } from "@/lib/i18n";
 import { isReferenceSection } from "@/lib/sections";
 
 export default async function ReferencesPage() {
   const { t } = await getT();
+  const appId = getAppId();
   const rows = await db
     .select({ id: designReferences.id, section: designReferences.section, imageId: designReferences.imageId, fileName: designReferences.fileName, note: designReferences.note })
     .from(designReferences)
+    .where(eq(designReferences.appId, appId))
     .orderBy(asc(designReferences.createdAt));
   const items = rows.filter((r): r is ReferenceItem => isReferenceSection(r.section));
   const workflow = [t("refs.flow1"), t("refs.flow2"), t("refs.flow3"), t("refs.flow4")];
